@@ -1,0 +1,40 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>images/passIcon.png</file>
+        <file>images/userIcon.png</file>
+        <file>images/lA.png</file>
+        <file>images/rA.png</file>
+        <file>images/dA.png</file>
+        <file>images/calendarIcon.png</file>
+        <file>images/deleteIcon.png</file>
+        <file>images/editIcon.png</file>
+        <file>images/icons8-name-16.png</file>
+        <file>images/logo.svg</file>
+        <file>images/logout.svg</file>
+        <file>images/add-user.svg</file>
+        <file>images/sign-up.svg</file>
+    </qresource>
+    <qresource prefix="/">
+        <file>qml/main.qml</file>
+        <file>qml/LoginWindow.qml</file>
+        <file>qml/CommonComponents/CustomTextInput.qml</file>
+        <file>qml/CommonComponents/CustomCheckBox.qml</file>
+        <file>qml/CommonComponents/CustomMediumButton.qml</file>
+        <file>qml/MainWindow.qml</file>
+        <file>qml/CommonComponents/CustomTableView.qml</file>
+        <file>qml/ReportObject.qml</file>
+        <file>qml/ReportsController.qml</file>
+        <file>qml/ProjectObject.qml</file>
+        <file>qml/ProjectsController.qml</file>
+        <file>qml/AddTimeDialog.qml</file>
+        <file>qml/SignUpDialog.qml</file>
+        <file>qml/CommonComponents/CustomTumbler.qml</file>
+        <file>qml/CommonComponents/CustomComboBox.qml</file>
+        <file>qml/MainWindowHeader/HeaderLeftPart.qml</file>
+        <file>qml/MainWindowHeader/HeaderRightPart.qml</file>
+        <file>qml/MainWindowHeader/HeaderMiddlePart.qml</file>
+        <file>qml/ManageUserReportsDialog.qml</file>
+        <file>qml/AssignProjectDialog.qml</file>
+        <file>qml/CommonComponents/CustomCalendar.qml</file>
+    </qresource>
+</RCC>
