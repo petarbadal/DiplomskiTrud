@@ -1,8 +1,6 @@
 #ifndef LOGIN_H
 #define LOGIN_H
 
-#include <QDebug>
-
 #include "database/mydatabase.h"
 
 class Login : public QObject
@@ -12,19 +10,20 @@ public:
     Q_PROPERTY(QString savedUserName  READ savedUserName WRITE setSavedUserName NOTIFY savedUserNameChanged)
     Q_PROPERTY(QString savedUserPass READ savedUserPass WRITE setSavedUserPass NOTIFY savedUserPassChanged)
 
+    explicit Login(QObject *parent = nullptr);
+
+    Q_INVOKABLE bool buttonLogInClicked(const QString &user, const QString &password);
+    Q_INVOKABLE bool buttonNextClicked(const QString &userName);
+    Q_INVOKABLE bool saveCreditentials(const QString &user,const QString &password);
+    Q_INVOKABLE bool deleteCreditentials();
+
     QString savedUserName() const {
         return m_settings->value("user").toString();
     }
+
     QString savedUserPass() const {
         return m_settings->value("password").toString();
     }
-
-    explicit Login(QObject *parent = nullptr);
-
-    Q_INVOKABLE bool buttonLogInClicked(const QString user, const QString password);
-    Q_INVOKABLE bool buttonNextClicked(const QString userName);
-    Q_INVOKABLE bool saveCreditentials(const QString &user,const QString &password);
-    Q_INVOKABLE bool deleteCreditentials();
 
 signals:
     void savedUserNameChanged(QString name);

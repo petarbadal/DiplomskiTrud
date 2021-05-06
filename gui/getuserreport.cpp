@@ -2,7 +2,7 @@
 
 GetUserReport::GetUserReport(QObject *parent) : QObject(parent)
 {
-    connect(MyDatabase::instance(), SIGNAL(setCheckBoxProjects(QString)), this, SIGNAL(newProjectReceived(QString)));
+    connect(MyDatabase::instance(), SIGNAL(setComboBoxUsers(QString)), this, SIGNAL(newProjectReceived(QString)));
     connect(MyDatabase::instance(), SIGNAL(setReportsInGetUserDialog(QString, QString, QString, QString)), this, SLOT(onSetReportDetails(QString, QString, QString, QString)));
 }
 
@@ -32,9 +32,8 @@ void GetUserReport::getUsersForComboBox()
 {
     emit clearUsers();
 
-    int flag = 3;
-    if(!MyDatabase::instance()->getUsersQuery(flag))
-        qDebug()<<"Fail to setup GetUserReport ComboBox";
+    if(!MyDatabase::instance()->getUsersQuery())
+        qDebug() << "Fail to setup Workers ComboBox";
 }
 
 bool GetUserReport::onButtonSaveReportClicked(QString filePath, QString data)

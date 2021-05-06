@@ -1,200 +1,130 @@
 #include "mydatabase.h"
 
-#include <QtCore/QDebug>
-
 MyDatabase* MyDatabase::m_instance = NULL;
+
+static const QString databasePath("C:\\Users\\petar\\Documents\\PMaster\\ProjectTimeMaster\\DB\\main\\");
+static const QString databaseName("time_logger_db.sqlite");
+
+static const QString getWorkerUserQuery("SELECT COUNT(1) FROM workers WHERE workeruser = '%1'");
+static const QString checkLoginPassQuery("SELECT password, isadmin FROM workers WHERE workeruser = '%1'");
+static const QString createWorkersTableQuery("CREATE TABLE IF NOT EXISTS workers (workeruser varchar(20) primary key not null unique, name varchar(20), surname varchar(20), password varchar(50), isadmin integer(1))");
+static const QString createProjectsTableQuery("CREATE TABLE IF NOT EXISTS projects (projectname varchar(20) primary key not null unique, projectdescription varchar(200), startdate date, enddate date, companyname varchar(50), clientname varchar(30), projectworker varchar(20))");
+static const QString createReportsTableQuery("CREATE TABLE IF NOT EXISTS reports (wuser varchar(20) references workers(workeruser), pname varchar(20) references projects(projectname), spendtime int4, description varchar(200), reportdate date, constraint pkreport primary key (wuser, pname, reportdate))");
+
+static const QString getAllWorkersQuery("SELECT workeruser FROM workers");
 
 MyDatabase::MyDatabase(QObject *parent) : QObject(parent)
 {}
 
-//Return DB Instance
-MyDatabase* MyDatabase::instance()
-{
+MyDatabase* MyDatabase::instance() {
     if(!m_instance)
         m_instance = new MyDatabase();
+
     return m_instance;
 }
-//Delete Instance
-void MyDatabase::destroyInstance()
-{
-    if (m_instance != nullptr)
-    {
+
+void MyDatabase::destroyInstance() {
+    if (m_instance != nullptr) {
         delete m_instance;
         m_instance = nullptr;
     }
 }
-//Get and set IsUser are used when user with admin privilege logs in as Normal user
-int MyDatabase::getIsUser() const
-{
+
+int MyDatabase::getIsUser() const {
     return m_isUser;
 }
 
-void MyDatabase::setIsUser(int isUser)
-{
-    qDebug() << "User: " << isUser;
+void MyDatabase::setIsUser(int isUser) {
     m_isUser = isUser;
 }
 
-bool MyDatabase::checkUserNameQuery(const QString &userName)
-{
-    bool isOkay = false;
+bool MyDatabase::checkUserNameQuery(const QString &userName) {
+    QSqlQuery query(m_myDatabase);
 
-    QSqlQuery queryAuthentication(m_myDatabase);
-    queryAuthentication.prepare("select workeruser from workers;");
+    if(!query.exec(getWorkerUserQuery.arg(userName))) {
+        qDebug() << "ERROR : unable to get USER NAME information from workers table";
+        return false;
+    }
 
-    if(!queryAuthentication.exec())
-    {
-        qDebug()<<"ERROR : unable to get USER NAME information from workers table";
-    }
-    else
-    {
-        while(queryAuthentication.next())
-        {
-            if((queryAuthentication.value(0) == userName))
-            {
-                //if we find a match we show the time status window and update the data shown there to be the most recent one
-                qDebug()<<"Found user name: " << userName;
-                isOkay = true;
-                break;
-            }
-            else {
-                qDebug()<<"Did not found user: " << userName;
-            }
-        }
-    }
-    return isOkay;
+    if(query.next())
+        return query.value(0).toBool();
+
+    return false;
 }
 
+bool MyDatabase::getUsersQuery() {
+    QSqlQuery query(m_myDatabase);
 
-//This Query return String List of all Users in Database
-bool MyDatabase::getUsersQuery(int flag)
-{
-    bool isOkay=false;
-    //Query for getting the name of the user so it can be set to the table
-    QSqlQuery getWorkers(m_myDatabase);
-    getWorkers.prepare("select workeruser from workers");
-    if(!getWorkers.exec())
-    {
+    if(!query.exec(getAllWorkersQuery))
         qDebug()<<"ERROR : unable to get workers from workers table";
-    }
-    else
-    {
-        if(flag==1)
-        {
-            qDebug() << "In FLAG 1";
-            while(getWorkers.next())
-            {
-                QString text;
-                text = getWorkers.value(0).toString();
-                emit setComboBoxUsersMainW(text);
-            }
+    else {
+        while(query.next()) {
+            QString text(query.value(0).toString());
+            if(!text.isEmpty())
+                emit setComboBoxUsers(text);
         }
-        else
-            if(flag==2)
-            {
-                while(getWorkers.next())
-                {
-                    QString text;
-                    text = getWorkers.value(0).toString();
-                    qDebug() << "NEW USER " << text;
-                    emit setComboBoxUsers(text);
-                }
-            }
-        else if(flag==3)
-            {
-                while(getWorkers.next())
-                {
-                    QString text;
-                    text = getWorkers.value(0).toString();
-                    emit setComboBoxGetUserReport(text);
-                }
-            }
-        isOkay = true;
+        return true;
     }
-    return isOkay;
+    return false;
 }
-//Method used to open a connection to the database
-bool MyDatabase::openConnection()
-{
-    QString path;
-    path = "C:/Users/Petar/Desktop/Diplomska_Project_Juggernaut";
-    qDebug()<<path;
-    m_myDatabase=QSqlDatabase::addDatabase("QSQLITE");
-    m_myDatabase.setDatabaseName(path+"/time_logger_db.sqlite");
-    qDebug()<<"Open!";
-    if(!m_myDatabase.open())
-    {
+
+bool MyDatabase::openConnection() {
+    qDebug() << "DB Path: " << databasePath;
+    m_myDatabase = QSqlDatabase::addDatabase("QSQLITE");
+    m_myDatabase.setDatabaseName(databasePath + databaseName);
+
+    if(!m_myDatabase.open()) {
         qDebug()<<"ERROR : "<< m_myDatabase.lastError().text();
         return false;
     }
-    else
-    {
-        return true;
-    }
+
+    return true;
 }
-//closing the connection we have with the database
-void MyDatabase::closeConnection()
-{
+
+void MyDatabase::closeConnection() {
     m_myDatabase.removeDatabase(QSqlDatabase::defaultConnection);
     m_myDatabase.close();
-    qDebug()<<"Close!";
 }
-void MyDatabase::setCurrentUser(QString user)
-{
+void MyDatabase::setCurrentUser(QString user) {
     m_currentUser = user;
 }
 
-QString MyDatabase::getCurrentUser()
-{
+QString MyDatabase::getCurrentUser() {
     return m_currentUser;
 }
 
-int MyDatabase::getAction() const
-{
+int MyDatabase::getAction() const {
     return m_action;
 }
 
-void MyDatabase::setAction(int value)
-{
+void MyDatabase::setAction(int value) {
     m_action = value;
 }
 
-bool MyDatabase::createTablesQuery()
-{
-    bool isOkay = true;
-    //This query is used to create the database tables, if they are already created then this part is ignored
-    QSqlQuery queryCreateTables(m_myDatabase);
-    queryCreateTables.prepare("CREATE TABLE IF NOT EXISTS workers (workeruser varchar(20) primary key not null unique,name varchar(20),surname varchar(20),password varchar(50), isadmin integer(1));");
-    if(queryCreateTables.exec())
-    {
+bool MyDatabase::createTablesQuery() {
+    QSqlQuery query(m_myDatabase);
+
+    if(query.exec(createWorkersTableQuery))
         qDebug()<<"Table workers is available!";
-    }
-    else {
-        isOkay = false;
-    }
-    queryCreateTables.clear();
-    queryCreateTables.prepare("CREATE TABLE IF NOT EXISTS projects (projectname varchar(20) primary key not null unique,projectdescription varchar(200),startdate date, enddate date,companyname varchar(50),clientname varchar(30), projectworker varchar(20));");
-    if(queryCreateTables.exec())
-    {
+    else
+        return false;
+
+    query.clear();
+    if(query.exec(createProjectsTableQuery))
         qDebug()<<"Table projects is available!";
-    }
-    else {
-        isOkay = false;
-    }
-    queryCreateTables.clear();
-    queryCreateTables.prepare("CREATE TABLE IF NOT EXISTS reports (wuser varchar(20) references workers(workeruser),pname varchar(20) references projects(projectname),spendtime int4, description varchar(200),reportdate date,constraint pkreport primary key (wuser,pname,reportdate));");
-    if(queryCreateTables.exec())
-    {
+    else
+        return false;
+
+    query.clear();
+    if(query.exec(createReportsTableQuery))
         qDebug()<<"Table reports is available!";
-    }
-    else {
-        isOkay = false;
-    }
-    return isOkay;
+    else
+        return false;
+
+    return true;
 }
 
-bool MyDatabase::signUpCheckQuery(QString workeruser, QString name, QString surname, QString password, bool isAdmin)
-{
+bool MyDatabase::signUpCheckQuery(QString workeruser, QString name, QString surname, QString password, bool isAdmin) {
     bool isOkay = false;
 
     QSqlQuery queryAvailable(m_myDatabase);
@@ -237,41 +167,25 @@ bool MyDatabase::signUpCheckQuery(QString workeruser, QString name, QString surn
     return isOkay;
 }
 
-bool MyDatabase::logInCheckQuery(QString user, QByteArray cryptedPassword)
-{
-    bool isOkay = false;
-    //Query that gets the login information out of the database for comparison with the input
-    QSqlQuery queryAuthentication(m_myDatabase);
-    queryAuthentication.prepare("select workeruser,password,isadmin from workers;");
-    if(!queryAuthentication.exec())
-    {
-        qDebug()<<"ERROR : unable to get login information from workers table";
-    }
-    else
-    {
-        //This loop compares every password from the database with the input password untill it finds a match or it reaches end of database
-        while(queryAuthentication.next())
-        {
-            if((queryAuthentication.value(0) == user) && (queryAuthentication.value(1) == cryptedPassword))
-            {
-                //if we find a match we show the time status window and update the data shown there to be the most recent one
-
-                MyDatabase::instance()->setCurrentUser(user);
-                MyDatabase::instance()->setIsAdmin(queryAuthentication.value(2).toBool());
-                qDebug()<<"Login Succesfull! " << m_isAdmin;
-                isOkay = true;
-                break;
-            }
-            else {
-                qDebug()<<"Did not match!";
-            }
+bool MyDatabase::logInCheckQuery(const QString &user, const QByteArray &cryptedPassword) {
+    QSqlQuery query(m_myDatabase);
+    if(!query.exec(checkLoginPassQuery.arg(user))) {
+        qDebug() << "ERROR : unable to get login information from workers table";
+        return false;
+    } else if(query.next()) {
+        if(query.value(0) == cryptedPassword) {
+            MyDatabase::instance()->setCurrentUser(user);
+            MyDatabase::instance()->setIsAdmin(query.value(1).toBool());
+            return true;
         }
+        else
+            qDebug() << "Did not match!";
     }
-    return isOkay;
+
+    return false;
 }
 
-bool MyDatabase::setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
-{
+bool MyDatabase::setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek) {
     bool isOkay = false;
     //Query that selects the total time spent for each project for the current week
     QSqlQuery getValues(m_myDatabase);
@@ -323,8 +237,7 @@ bool MyDatabase::setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
     return isOkay;
 }
 
-bool MyDatabase::setBarChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
-{
+bool MyDatabase::setBarChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek) {
     bool isOkay = false;
     //Query that selects the time spent on a project each day for a worker
     QSqlQuery loadHours(m_myDatabase);

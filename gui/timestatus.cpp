@@ -15,7 +15,7 @@ TimeStatus::TimeStatus(QObject *parent) :
 
     connect(MyDatabase::instance(), SIGNAL(updateIsAdmin(bool)), this, SLOT(setIsAdmin(bool)));
 
-    connect(MyDatabase::instance(), SIGNAL(setComboBoxUsersMainW(QString)), this, SIGNAL(newComboBoxUserReceived(QString)));
+    connect(MyDatabase::instance(), SIGNAL(setComboBoxUsers(QString)), this, SIGNAL(newComboBoxUserReceived(QString)));
 
     connect(MyDatabase::instance(), SIGNAL(dataUpdated()), this, SLOT(onDataUpdated()));
 
@@ -131,11 +131,10 @@ bool TimeStatus::onButtonSingUpClicked(const QString &user, const QString &name,
 
 void TimeStatus::getUsersForComboBox()
 {
-    //qDebug() << Q_FUNC_INFO;
-
     emit clearAllUsersComboBoxData();
 
-    MyDatabase::instance()->getUsersQuery(1);
+    if(!MyDatabase::instance()->getUsersQuery())
+        qDebug() << "Fail to setup Workers ComboBox";
 }
 
 void TimeStatus::setIsAdmin(bool isAdmin)

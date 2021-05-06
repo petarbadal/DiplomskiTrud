@@ -3,7 +3,7 @@
 AssignProject::AssignProject(QObject *parent) :
     QObject(parent)
 {
-    connect(MyDatabase::instance(),SIGNAL(setComboBoxUsers(QString)), this, SLOT(onNewUserReceived(QString)));
+    connect(MyDatabase::instance(), SIGNAL(setComboBoxUsers(QString)), this, SLOT(onNewUserReceived(QString)));
     setValues();
 }
 
@@ -13,12 +13,9 @@ AssignProject::~AssignProject()
 void AssignProject::setValues()
 {
     emit clearAllData();
-    int flag=2;
 
-    if(!MyDatabase::instance()->getUsersQuery(flag))
-        qDebug()<<"Fail to setup Assign Project ComboBox...";
-
-    qDebug()<<"Assign Project Dialog values are set...";
+    if(!MyDatabase::instance()->getUsersQuery())
+        qDebug() << "Fail to setup Workers ComboBox...";
 }
 
 bool AssignProject::buttonAssignProjectClicked(const QString projectName, const QString projectDescription, const QString clientName, const QString companyName, const QString startDate, const QString endDate, const QString projectWorker)

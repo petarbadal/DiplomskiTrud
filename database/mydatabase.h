@@ -12,10 +12,10 @@ public:
     static MyDatabase *instance();
     static void destroyInstance();
 
-    bool getUsersQuery(int flag);
-
     void closeConnection();
     bool openConnection();
+
+    bool getUsersQuery();
 
     void setCurrentUser(QString user);
     QString getCurrentUser();
@@ -27,7 +27,7 @@ public:
 
     bool signUpCheckQuery(QString workeruser, QString name, QString surname, QString password, bool isAdmin);
 
-    bool logInCheckQuery(QString user,QByteArray cryptedPassword);
+    bool logInCheckQuery(const QString &user, const QByteArray &cryptedPassword);
 
     bool setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek);
 
@@ -89,10 +89,9 @@ signals:
     void setCheckBoxProjects(QString text);
     void dataUpdatedAdmin();
     void setReportsInGetUserDialog(QString reportDate, QString projectName, QString desc, QString spentTime);
-    void setComboBoxUsers(QString user);
-    void setComboBoxUsersMainW(QString user);
-    void setComboBoxGetUserReport(QString user);
     void updateIsAdmin(bool isAdmin);
+
+    void setComboBoxUsers(const QString &user);
 
 private:
     explicit MyDatabase(QObject *parent = nullptr);
