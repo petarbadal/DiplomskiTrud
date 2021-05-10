@@ -11,22 +11,18 @@ class AssignProject : public QObject
 
 public:
     explicit AssignProject(QObject *parent = nullptr);
-    ~AssignProject();
 
     Q_INVOKABLE void setValues();
 
-    Q_INVOKABLE bool buttonAssignProjectClicked(const QString projectName,
-                                                const QString projectDescription,
-                                                const QString clientName,
-                                                const QString companyName,
-                                                const QString startDate,
-                                                const QString endDate,
-                                                const QString projectWorker);
-private slots:
-    void onNewUserReceived(QString user);
+    Q_INVOKABLE bool buttonAssignProjectClicked(const QString &projectName,
+                                                const QString &projectDescription,
+                                                const QString &clientName,
+                                                const QString &companyName,
+                                                const QString &startDate,
+                                                const QString &endDate,
+                                                const QString &projectWorker);
 
 signals:
-    void dataUpdatedAdmin();
     void newUserReceived(QString user);
     void clearAllData();
 };

@@ -2,13 +2,11 @@
 
 Login::Login(QObject *parent) :
     QObject(parent),
-    m_settings(new QSettings)
-{
+    m_settings(new QSettings) {
     openDBConnection();
 }
 
-bool Login::saveCreditentials(const QString &user, const QString &password)
-{
+bool Login::saveCreditentials(const QString &user, const QString &password) {
     m_settings->setValue("user", user);
     m_settings->setValue("password", password);
 
@@ -18,23 +16,20 @@ bool Login::saveCreditentials(const QString &user, const QString &password)
     return true;
 }
 
-bool Login::deleteCreditentials()
-{
+bool Login::deleteCreditentials() {
     m_settings->setValue("user", "");
     m_settings->setValue("password", "");
 
     return true;
 }
 
-void Login::setSavedUserName(QString name)
-{
+void Login::setSavedUserName(QString name) {
     m_settings->setValue("user", name);
 
     emit savedUserNameChanged(name);
 }
 
-void Login::setSavedUserPass(QString pass)
-{
+void Login::setSavedUserPass(QString pass) {
     m_settings->setValue("password", pass);
 
     emit savedUserPassChanged(pass);

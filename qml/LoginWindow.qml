@@ -32,8 +32,8 @@ Item {
         spacing: 5
 
         Rectangle {
-            width: 280
-            height: 170
+            width: 380
+            height: 270
             color: "white"
             Layout.alignment: Qt.AlignCenter
             Layout.topMargin: 5
@@ -48,7 +48,7 @@ Item {
         }
 
         Rectangle {
-            width: 300
+            width: 400
             height: 40
             color: "#cbe368"
 
@@ -224,10 +224,7 @@ Item {
                 id: loginButton
 
                 Layout.alignment: Qt.AlignBottom
-                Layout.topMargin: 10
-                Layout.leftMargin: 5
-                Layout.rightMargin: 5
-                Layout.bottomMargin: 5
+                Layout.margins: 5
                 enabled: loginButtonAvailable
 
                 background: Rectangle {

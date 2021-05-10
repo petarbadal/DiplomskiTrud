@@ -2,8 +2,7 @@
 
 MyDatabase* MyDatabase::m_instance = NULL;
 
-static const QString databasePath("C:\\Users\\petar\\Documents\\PMaster\\ProjectTimeMaster\\DB\\main\\");
-static const QString databaseName("time_logger_db.sqlite");
+static const QString databasePath(QString::fromStdString(__FILE__) + "\\..\\..\\DB\\main\\time_logger_db.sqlite");
 
 static const QString getWorkerUserQuery("SELECT COUNT(1) FROM workers WHERE workeruser = '%1'");
 static const QString checkLoginPassQuery("SELECT password, isadmin FROM workers WHERE workeruser = '%1'");
@@ -12,6 +11,18 @@ static const QString createProjectsTableQuery("CREATE TABLE IF NOT EXISTS projec
 static const QString createReportsTableQuery("CREATE TABLE IF NOT EXISTS reports (wuser varchar(20) references workers(workeruser), pname varchar(20) references projects(projectname), spendtime int4, description varchar(200), reportdate date, constraint pkreport primary key (wuser, pname, reportdate))");
 
 static const QString getAllWorkersQuery("SELECT workeruser FROM workers");
+static const QString getAllReportsQuery("SELECT reportdate, pname, description, spendtime FROM reports WHERE wuser=='%1' AND reportdate BETWEEN date('%2') AND date('%3')");
+static const QString getAllProjectsQuery("SELECT projectname FROM projects WHERE projectworker=='%1'");
+static const QString getProjectByNameQuery("SELECT projectname FROM projects WHERE projectname=='%1'");
+static const QString getDonutChartQuery("SELECT pname, sum(spendtime) FROM reports WHERE wuser=='%1' AND reportdate BETWEEN date('%2') AND date('%3') GROUP BY pname");
+static const QString getTotalTimeOnProject("SELECT sum(spendtime) FROM reports WHERE wuser=='%1' AND reportdate BETWEEN date('%2') AND date('%3')");
+static const QString getBarChartQuery("SELECT spendtime, reportdate FROM reports WHERE wuser=='%1' AND reportdate BETWEEN date('%2') AND date('%3')");
+static const QString getTotalHoursQuery("SELECT reportdate, sum(spendtime) FROM reports WHERE pname=='%1' AND wuser=='%2' AND reportdate BETWEEN date('%3') AND date('%4') GROUP BY reportdate");
+
+static const QString deleteReportRowQuery("DELETE FROM reports WHERE wuser=='%1' AND pname='%2' AND reportdate='%3'");
+
+static const QString insertNewReportRowQuery("INSERT INTO reports VALUES ('%1','%2','%3','%4','%5')");
+static const QString updateReportRowQuery("UPDATE reports SET(spendtime, description)=('%1','%2') WHERE wuser=='%3' AND pname=='%4' AND reportdate=='%5'");
 
 MyDatabase::MyDatabase(QObject *parent) : QObject(parent)
 {}
@@ -39,7 +50,7 @@ void MyDatabase::setIsUser(int isUser) {
 }
 
 bool MyDatabase::checkUserNameQuery(const QString &userName) {
-    QSqlQuery query(m_myDatabase);
+    QSqlQuery query(m_database);
 
     if(!query.exec(getWorkerUserQuery.arg(userName))) {
         qDebug() << "ERROR : unable to get USER NAME information from workers table";
@@ -53,7 +64,7 @@ bool MyDatabase::checkUserNameQuery(const QString &userName) {
 }
 
 bool MyDatabase::getUsersQuery() {
-    QSqlQuery query(m_myDatabase);
+    QSqlQuery query(m_database);
 
     if(!query.exec(getAllWorkersQuery))
         qDebug()<<"ERROR : unable to get workers from workers table";
@@ -69,12 +80,12 @@ bool MyDatabase::getUsersQuery() {
 }
 
 bool MyDatabase::openConnection() {
-    qDebug() << "DB Path: " << databasePath;
-    m_myDatabase = QSqlDatabase::addDatabase("QSQLITE");
-    m_myDatabase.setDatabaseName(databasePath + databaseName);
+    m_database = QSqlDatabase::addDatabase("QSQLITE");
+    m_database.setDatabaseName(databasePath);
+    qDebug() << "DB Path: " << m_database.databaseName();
 
-    if(!m_myDatabase.open()) {
-        qDebug()<<"ERROR : "<< m_myDatabase.lastError().text();
+    if(!m_database.open()) {
+        qDebug()<<"ERROR : "<< m_database.lastError().text();
         return false;
     }
 
@@ -82,10 +93,10 @@ bool MyDatabase::openConnection() {
 }
 
 void MyDatabase::closeConnection() {
-    m_myDatabase.removeDatabase(QSqlDatabase::defaultConnection);
-    m_myDatabase.close();
+    m_database.removeDatabase(QSqlDatabase::defaultConnection);
+    m_database.close();
 }
-void MyDatabase::setCurrentUser(QString user) {
+void MyDatabase::setCurrentUser(const QString &user) {
     m_currentUser = user;
 }
 
@@ -102,7 +113,7 @@ void MyDatabase::setAction(int value) {
 }
 
 bool MyDatabase::createTablesQuery() {
-    QSqlQuery query(m_myDatabase);
+    QSqlQuery query(m_database);
 
     if(query.exec(createWorkersTableQuery))
         qDebug()<<"Table workers is available!";
@@ -124,51 +135,29 @@ bool MyDatabase::createTablesQuery() {
     return true;
 }
 
-bool MyDatabase::signUpCheckQuery(QString workeruser, QString name, QString surname, QString password, bool isAdmin) {
-    bool isOkay = false;
-
-    QSqlQuery queryAvailable(m_myDatabase);
-    queryAvailable.prepare("select workeruser from workers;");
+bool MyDatabase::signUpCheckQuery(const QString &workeruser, const QString &name, const QString &surname, const QString &password, const bool isAdmin) {
+    QSqlQuery queryAvailable(m_database);
 
     QByteArray cryptedPassword;
     cryptedPassword = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Md5);
 
-    if(!queryAvailable.exec())
-    {
+    if(!queryAvailable.exec(getWorkerUserQuery.arg(workeruser)))
         qDebug()<<"ERROR : unable to get name of worker from workers table";
-        isOkay = false;
-    }
-    else
-    {
-        bool checker = false;
-        while(queryAvailable.next())
-        {
-            if(workeruser == queryAvailable.value(0))
-            {
-                qDebug()<<"Username already exists!";
-                checker = true;
-                break;
-            }
-        }
-        //If the username is not taken then queryFillInTable is executed and the user is created in the database
-        if(!checker)
-        {
-            QSqlQuery queryFillInTable(m_myDatabase);
-            bool adminChecked = isAdmin ? true : false;
-            queryFillInTable.prepare("insert into workers values ('" + workeruser + "','" + name + "','" + surname + "','" + cryptedPassword + "',:adminChecked);");
-            queryFillInTable.bindValue(":adminChecked", adminChecked);
-            if(queryFillInTable.exec())
-            {
+    else {
+        if(!queryAvailable.value(0).toBool()) {
+            QSqlQuery queryFillInTable(m_database);
+            queryFillInTable.prepare("INSERT INTO workers VALUES ('" + workeruser + "','" + name + "','" + surname + "','" + cryptedPassword + "','" + isAdmin + "'");
+            if(queryFillInTable.exec()) {
                 qDebug()<<"Successfuly signed up!";
-                isOkay = true;
+                return true;
             }
         }
     }
-    return isOkay;
+    return false;
 }
 
 bool MyDatabase::logInCheckQuery(const QString &user, const QByteArray &cryptedPassword) {
-    QSqlQuery query(m_myDatabase);
+    QSqlQuery query(m_database);
     if(!query.exec(checkLoginPassQuery.arg(user))) {
         qDebug() << "ERROR : unable to get login information from workers table";
         return false;
@@ -185,132 +174,100 @@ bool MyDatabase::logInCheckQuery(const QString &user, const QByteArray &cryptedP
     return false;
 }
 
-bool MyDatabase::setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek) {
-    bool isOkay = false;
-    //Query that selects the total time spent for each project for the current week
-    QSqlQuery getValues(m_myDatabase);
-    getValues.prepare("select pname,sum(spendtime) from reports where wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"') group by pname");
-    if(!getValues.exec()){
-        qDebug()<<"ERROR : Setting the donut chart failed!";
-    }
-    else
-    {
-        int counter = 0;
-        //Query that sums up the total time the user has spent this week on the projects
-        QSqlQuery getSum(m_myDatabase);
-        getSum.prepare("Select sum(spendtime) from reports where wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"')");
-        if(!getSum.exec())
-        {
-            qDebug()<<"ERROR : Setting donut chart failed!";
-        }
-        else
-        {
-            getSum.first();
-            counter=getSum.value(0).toInt();
-            //Show the spent time this week
-            if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-            {
-                emit updateHoursAdmin(getSum.value(0).toString() == 0 ? "0" : getSum.value(0).toString());
-            }
-            else
-                emit updateHours(getSum.value(0).toString() == 0 ? "0" : getSum.value(0).toString());
+bool MyDatabase::setDonutChartQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek) {
+    QSqlQuery getValues(m_database);
 
-            isOkay = true;
+    if(!getValues.exec(getDonutChartQuery.arg(m_currentUser, firstDayOfWeek.toString("yyyy-MM-dd"), lastDayOfWeek.toString("yyyy-MM-dd"))))
+        qDebug()<<"ERROR : Setting the donut chart failed!";
+    else {
+        int counter = 0;
+        QSqlQuery getSum(m_database);
+
+        if(!getSum.exec(getTotalTimeOnProject.arg(m_currentUser, firstDayOfWeek.toString("yyyy-MM-dd"), lastDayOfWeek.toString("yyyy-MM-dd"))))
+            qDebug()<<"ERROR : Setting donut chart failed!";
+        else {
+            getSum.first();
+            counter = getSum.value(0).toInt();
+            emit updateHours(getSum.value(0).toString() == 0 ? "0" : getSum.value(0).toString());
         }
-        //Loop that calculates the values and sets them to a clise in the pie
-        while(getValues.next())
-        {
-            double br=(getValues.value(1).toDouble()/counter)*100;
-            //The string show is the info that is labeled to each slice
+
+        while(getValues.next()) {
+            double br = (getValues.value(1).toDouble() / counter) * 100;
+
             QString show;
-            show.append(getValues.value(0).toString()+"\n");
-            show.append(getValues.value(1).toString()+" hrs");
-            show.append("["+QString::number(int(br))+"%]");
+            show.append(getValues.value(0).toString() + "\n");
+            show.append(getValues.value(1).toString() + " hrs");
+            show.append("[" + QString::number(int(br)) + "%]");
 
             setPieValues(show, getValues.value(1).toInt());
         }
-        if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-        {
-        }
-
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
-bool MyDatabase::setBarChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek) {
-    bool isOkay = false;
-    //Query that selects the time spent on a project each day for a worker
-    QSqlQuery loadHours(m_myDatabase);
-    loadHours.prepare("Select spendtime,reportdate from reports where wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"')");
-    if(!loadHours.exec())
-    {
+bool MyDatabase::setBarChartQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek) {
+    QSqlQuery loadHours(m_database);
+    if(!loadHours.exec(getBarChartQuery.arg(m_currentUser, firstDayOfWeek.toString("yyyy-MM-dd"), lastDayOfWeek.toString("yyyy-MM-dd"))))
         qDebug()<<"ERROR : Setting bar chart failed!";
-    }
-    else
-    {
-        int monday = 0;
-        int tuesday = 0;
-        int wednesday = 0;
-        int thursday = 0;
-        int friday = 0;
-        int saturday = 0;
-        int sunday = 0;
-        //Loop that counts the hours spent each day for all the projects and taks
-        while(loadHours.next())
-        {
-            QDate firstDate;
-            firstDate = firstDayOfWeek;
+    else {
+        int monday = 0, tuesday = 0, wednesday = 0, thursday = 0, friday = 0, saturday = 0, sunday = 0;
+
+        while(loadHours.next()) {
+            QDate firstDate = firstDayOfWeek;
+
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 monday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 tuesday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 wednesday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 thursday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 friday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 saturday += loadHours.value(0).toInt();
                 continue;
             }
+
             firstDate = firstDate.addDays(1);
             if(loadHours.value(1).toString() == firstDate.toString("yyyy-MM-dd")) {
                 sunday += loadHours.value(0).toInt();
                 continue;
             }
         }
-        if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-        {
-            emit setDaysAdmin(monday, tuesday, wednesday, thursday, friday, saturday, sunday);
-        }
-        else
-            emit setDays(monday, tuesday, wednesday, thursday, friday, saturday, sunday);
+        emit setDays(monday, tuesday, wednesday, thursday, friday, saturday, sunday);
 
-        isOkay = true;
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
 bool MyDatabase::getProjectCountQuery()
 {
     bool isOkay = false;
-    QSqlQuery getSize(m_myDatabase);
+    QSqlQuery getSize(m_database);
     getSize.prepare("select count(projectname) from projects where projectworker == '"+MyDatabase::instance()->getCurrentUser()+"'");
     if(!getSize.exec()){
         qDebug()<<"ERROR : couldn't count the projects";
@@ -327,7 +284,7 @@ bool MyDatabase::getReportsCountQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
 {
     bool isOkay = false;
     //Query that counts the number of reports this week from the user so it can set the row count of the table
-    QSqlQuery getSize(m_myDatabase);
+    QSqlQuery getSize(m_database);
     getSize.prepare("select count(description) from reports where wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"')");
     m_reportsCount = 0;
     if(!getSize.exec()){
@@ -342,185 +299,87 @@ bool MyDatabase::getReportsCountQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
     return isOkay;
 }
 
-bool MyDatabase::getProjectQuery(int flag)
-{
-    bool isOkay=false;
-    //Query for getting the name of the project so it can be set to the table
-    QSqlQuery getProjects(m_myDatabase);
-    getProjects.prepare("select projectname from projects where projectworker == '"+MyDatabase::instance()->getCurrentUser()+"'");
-    if(!getProjects.exec())
-    {
-        qDebug()<<"ERROR : unable to get projects from projects table";
-    }
-    else
-    {
-        if(flag == 1){
-            int i = 0;
-            while(getProjects.next())
-            {
-                QString text;
-                text = getProjects.value(0).toString();
-                if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-                {
-                    emit setProjectsAdmin(text,i);
-                }
-                else
-                    emit setProjects(text,i);
+bool MyDatabase::getProjectQuery() {
+    QSqlQuery getProjects(m_database);
 
-                i++;
-            }
+    if(!getProjects.exec(getAllProjectsQuery.arg(m_currentUser)))
+        qDebug()<<"ERROR : unable to get projects from projects table";
+    else {
+        int i = 0;
+        while(getProjects.next()) {
+            const QString &text = getProjects.value(0).toString();
+            emit setProjects(text, i);
+
+            i++;
         }
-        if(flag == 2)
-        {
-            while(getProjects.next())
-            {
-                QString text;
-                text = getProjects.value(0).toString();
-                emit setCheckBox(text);
-            }
-        }
-        if(flag == 3)
-        {
-            int counter = 0;
-            while(getProjects.next())
-            {
-                QString text;
-                text = getProjects.value(0).toString();
-                emit setCheckBox(text);
-                counter++;
-            }
-        }
-        if(flag == 4)
-        {
-            while(getProjects.next())
-            {
-                QString text;
-                text = getProjects.value(0).toString();
-                emit setCheckBoxProjects(text);
-            }
-        }
-        isOkay = true;
+
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
-bool MyDatabase::getReportsQuery(QDate firstDayOfWeek, QDate lastDayOfWeek)
-{
-    qDebug() << Q_FUNC_INFO << firstDayOfWeek << "|||" << lastDayOfWeek;
-    bool isOkay = false;
-    //Query that selects all the information from the report table that is needed to be displayed in the table
-    QSqlQuery loadReport(m_myDatabase);
-    loadReport.prepare("select reportdate,pname,description,spendtime from reports where wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"')");
-    if(!loadReport.exec())
-    {
+bool MyDatabase::getReportsQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek) {
+    QSqlQuery loadReport(m_database);
+
+    if(!loadReport.exec(getAllReportsQuery.arg(m_currentUser, firstDayOfWeek.toString("yyyy-MM-dd"), lastDayOfWeek.toString("yyyy-MM-dd"))))
         qDebug()<<"ERROR : unable to get reports from reports table";
-    }
-    else
-    {
-        //Loop that fills in the table with the information from the query
-        while(loadReport.next())
-        {
-                if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-                {
-                    emit setReportsAdmin(1,1,loadReport.value(1).toString());
-                }
-                else {
-                    QString reportDate = loadReport.value("reportdate").toString();
-                    QString projectName = loadReport.value("pname").toString();
-                    QString desc = loadReport.value("description").toString();
-                    QString spendTime = loadReport.value("spendtime").toString();
+    else {
+        while(loadReport.next()) {
+            const QString &reportDate = loadReport.value("reportdate").toString();
+            const QString &projectName = loadReport.value("pname").toString();
+            const QString &desc = loadReport.value("description").toString();
+            const QString &spendTime = loadReport.value("spendtime").toString();
 
-                    emit setReports(reportDate, projectName, desc, spendTime);
-                }
-
-            emit addButtons(1);
-            emit addToolTip(1);
+            emit setReports(reportDate, projectName, desc, spendTime);
         }
-        isOkay = true;
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
-bool MyDatabase::getHoursQuery(QString projectName, QDate firstDayOfWeek, QDate lastDayOfWeek, int j)
-{
-    qDebug() << "FirstDay " << firstDayOfWeek << " LastDay "<<lastDayOfWeek;
-    bool isOkay = false;
-    QSqlQuery returnHours(m_myDatabase);
-    returnHours.prepare("select reportdate,sum(spendtime) from reports where  pname=='"+projectName+"' and wuser=='"+MyDatabase::instance()->getCurrentUser()+"'and reportdate BETWEEN date('"+firstDayOfWeek.toString("yyyy-MM-dd")+"') and date('"+lastDayOfWeek.toString("yyyy-MM-dd")+"') group by reportdate ");
-    if(!returnHours.exec())
-    {
+bool MyDatabase::getHoursQuery(const QString &projectName, const QDate &firstDayOfWeek, const QDate &lastDayOfWeek, const int j) {
+    QSqlQuery returnHours(m_database);
+
+    if(!returnHours.exec(getTotalHoursQuery.arg(projectName, m_currentUser, firstDayOfWeek.toString("yyyy-MM-dd"), lastDayOfWeek.toString("yyyy-MM-dd"))))
         qDebug()<<"ERROR : unable to return hours from reports table";
-    }
-    else
-    {
+    else {
         while(returnHours.next())
-        {
-            if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-            {
-                emit setHoursAdmin(returnHours.value(0).toString(),returnHours.value(1).toString(),j);
-            }
-            else
-                emit setHours(returnHours.value(0).toDate().dayOfWeek(),returnHours.value(1).toInt(),j);
-
-        }
-        isOkay = true;
+            emit setHours(returnHours.value(0).toDate().dayOfWeek(), returnHours.value(1).toInt(), j);
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
-bool MyDatabase::deleteRowReportsQuery(QString user, QString project, QString date)
-{
-    bool isOkay = false;
-    //Query used to insert the values in the table
-    QSqlQuery queryDeleteRow(m_myDatabase);
-    queryDeleteRow.prepare("DELETE FROM reports WHERE wuser='"+user+"'and pname='"+project+"'and reportdate='"+date+"';");
-    if(queryDeleteRow.exec())
-    {
-        if(MyDatabase::instance()->getIsAdmin() && !MyDatabase::instance()->getIsUser())
-        {
-            emit dataUpdatedAdmin();
-        }
-        else
-            emit dataUpdated();
+bool MyDatabase::deleteRowReportsQuery(const QString &user, const QString &project, const QString &date) {
+    QSqlQuery queryDeleteRow(m_database);
 
-        isOkay = true;
-    }
-    else
-    {
+    if(!queryDeleteRow.exec(deleteReportRowQuery.arg(user, project, date)))
         qDebug()<<"ERROR : deleting the row failed";
+    else {
+        emit dataUpdated();
+
+        return true;
     }
-    return isOkay;
+
+    return false;
 }
 
-bool MyDatabase::projectNameCheckQuery(QString projectName)
-{
-    bool isOkay = true;
-    QSqlQuery queryAvailable(m_myDatabase);
-    queryAvailable.prepare("select projectname from projects;");
-    if(!queryAvailable.exec())
-    {
+bool MyDatabase::projectNameCheckQuery(const QString &projectName) {
+    QSqlQuery query(m_database);
+    if(!query.exec(getProjectByNameQuery.arg(projectName)))
         qDebug()<<"ERROR : unable to get projects from projects table";
+    else {
+        if(query.next())
+            return false;
     }
-    else
-    {
-        //this checks if there is already a project with this name in the database, hinting that this project is created and already worked on
-        while(queryAvailable.next())
-        {
-            if(projectName == queryAvailable.value(0))
-            {
-                qDebug()<<"This project already exists...";
-                isOkay = false;
-                break;
-            }
-        }
-    }
-    return isOkay;
+
+    return true;
 }
 
 bool MyDatabase::createProjectsRowQuery(QString projectName, QString projectDescription, QString startDate, QString endDate, QString companyName, QString clientName, QString projectWorker)
 {
     bool isOkay = false;
-    QSqlQuery queryFillInTable(m_myDatabase);
+    QSqlQuery queryFillInTable(m_database);
     queryFillInTable.prepare("insert into projects values ('"+projectName+"','"+projectDescription+"','"+startDate+"','"+endDate+"','"+companyName+"','"+clientName+"','"+projectWorker+"');");
     if(queryFillInTable.exec())
     {
@@ -533,33 +392,28 @@ bool MyDatabase::createProjectsRowQuery(QString projectName, QString projectDesc
     return isOkay;
 }
 
-bool MyDatabase::createReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date)
-{
-    QSqlQuery queryFillInTable(m_myDatabase);
-    queryFillInTable.prepare("insert into reports values ('"+person+"','"+project+"','"+time+"','"+description+"','"+date+"');");
+bool MyDatabase::createReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date) {
+    QSqlQuery queryFillInTable(m_database);
 
-    if(queryFillInTable.exec()) {
+    if(!queryFillInTable.exec(insertNewReportRowQuery.arg(person, project, time, description, date)))
+        qDebug()<<"ERROR : inserting row into reports failed";
+    else {
         emit dataUpdated();
         return true;
-    } else {
-        qDebug()<<"ERROR : inserting row into reports failed";
-        return false;
     }
+
+    return false;
 }
 
-bool MyDatabase::updateReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date)
-{
-    qDebug() << person << date;
+bool MyDatabase::updateReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date) {
+    QSqlQuery queryFillInTable(m_database);
 
-    QSqlQuery queryFillInTable(m_myDatabase);
-    queryFillInTable.prepare("UPDATE reports SET(spendtime, description)=('" + time + "', '" + description + "')WHERE wuser='" + person + "' and pname='" + project + "'and reportdate='" + date + "';");
-
-    if(queryFillInTable.exec())
-        return true;
-    else {
+    if(!queryFillInTable.exec(updateReportRowQuery.arg(time, description, person, project, date)))
         qDebug()<<"ERROR : updating row in reports failed";
-        return false;
-    }
+    else
+        return true;
+
+    return false;
 }
 
 int MyDatabase::getAllReportsCount() const
@@ -571,7 +425,7 @@ bool MyDatabase::getAllUserReportsQuery(QString user, QString projectName, QStri
 {
     bool isOkay = false;
     //Query that selects all the information from the report table that is needed to be displayed in the table
-    QSqlQuery loadReport(m_myDatabase);
+    QSqlQuery loadReport(m_database);
     if(projectName == "All Projects")
     {
         loadReport.prepare("select reportdate,pname,description,spendtime from reports where wuser=='"+user+"'AND reportdate BETWEEN '"+startDate+"' and '"+endDate+"'");
@@ -602,7 +456,7 @@ bool MyDatabase::getAllUserReportsCountQuery(QString user, QString projectName, 
 {
     bool isOkay = false;
     //Query that counts the number of reports this week from the user so it can set the row count of the table
-    QSqlQuery getSize(m_myDatabase);
+    QSqlQuery getSize(m_database);
     if(projectName == "All Projects")
     {
         getSize.prepare("select count(description) from reports where wuser=='"+user+"' and reportdate BETWEEN '"+startDate+"' and '"+endDate+"'");
@@ -627,33 +481,25 @@ int MyDatabase::getReportsCount() const
     return m_reportsCount;
 }
 
-bool MyDatabase::getAllUserProjects(QString user)
-{
-    bool isOkay=false;
-    //Query for getting the name of the project so it can be set to the table
-    QSqlQuery getProjects(m_myDatabase);
-    getProjects.prepare("select projectname from projects where projectworker == '"+user+"'");
-    if(!getProjects.exec())
-    {
+bool MyDatabase::getAllUserProjects(const QString &user) {
+    QSqlQuery getProjects(m_database);
+
+    if(!getProjects.exec(getAllProjectsQuery.arg(user)))
         qDebug()<<"ERROR : unable to get all user projects from projects table";
-    }
-    else
-    {
-        while(getProjects.next())
-        {
-            QString text;
-            text = getProjects.value(0).toString();
+    else {
+        while(getProjects.next()) {
+            const QString &text = getProjects.value(0).toString();
             emit setCheckBoxProjects(text);
         }
-        isOkay = true;
+        return true;
     }
-    return isOkay;
+    return false;
 }
 
 bool MyDatabase::getWorkerProjects(QString workerName)
 {
     bool isOkay = false;
-    QSqlQuery queryGetWorkerProjects(m_myDatabase);
+    QSqlQuery queryGetWorkerProjects(m_database);
     queryGetWorkerProjects.prepare("select pname from projects where wuser == '"+workerName+"'");
     if(queryGetWorkerProjects.exec())
     {

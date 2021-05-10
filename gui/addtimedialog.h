@@ -11,14 +11,12 @@ class AddTimeDialog : public QObject
 public:
     explicit AddTimeDialog(QObject *parent = nullptr);
 
-    ~AddTimeDialog();
-
     Q_INVOKABLE bool buttonAddTimeClicked(const QString &person,
                                           const QString &date,
                                           const QString &time,
                                           const QString &project,
                                           const QString &description,
-                                          bool edit);
+                                          const bool edit);
     Q_INVOKABLE void setProjectValues(const QString &user);
 
 signals:

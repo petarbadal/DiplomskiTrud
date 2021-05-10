@@ -30,8 +30,8 @@ Window {
     }
 
     visible: true
-    width: 300
-    height: 455
+    width: 400
+    height: 555
 
     maximumHeight: height
     maximumWidth: width

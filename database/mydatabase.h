@@ -17,7 +17,7 @@ public:
 
     bool getUsersQuery();
 
-    void setCurrentUser(QString user);
+    void setCurrentUser(const QString &user);
     QString getCurrentUser();
 
     int getAction() const;
@@ -25,28 +25,28 @@ public:
 
     bool createTablesQuery();
 
-    bool signUpCheckQuery(QString workeruser, QString name, QString surname, QString password, bool isAdmin);
+    bool signUpCheckQuery(const QString &workeruser, const QString &name, const QString &surname, const QString &password, const bool isAdmin);
 
     bool logInCheckQuery(const QString &user, const QByteArray &cryptedPassword);
 
-    bool setDonutChartQuery(QDate firstDayOfWeek, QDate lastDayOfWeek);
+    bool setDonutChartQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek);
 
-    bool setBarChartQuery(QDate firstDayOfWeek,QDate lastDayOfWeek);
+    bool setBarChartQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek);
 
-    bool getHoursQuery(QString projectName,QDate firstDayOfWeek,QDate lastDayOfWeek,int j);
+    bool getHoursQuery(const QString &projectName, const QDate &firstDayOfWeek, const QDate &lastDayOfWeek, const int j);
 
-    bool getProjectQuery(int flag);
+    bool getProjectQuery();
     bool getProjectCountQuery();
     bool createProjectsRowQuery(QString projectName,QString projectDescription,QString startDate,QString endDate,QString companyName,QString clientName,QString projectWorker);
-    bool projectNameCheckQuery(QString projectName);
+    bool projectNameCheckQuery(const QString &projectName);
 
-    bool getReportsQuery(QDate firstDayOfWeek,QDate lastDayOfWeek);
+    bool getReportsQuery(const QDate &firstDayOfWeek, const QDate &lastDayOfWeek);
     bool getReportsCountQuery(QDate firstDayOfWeek,QDate lastDayOfWeek);
 
     bool createReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date);
     bool updateReportsRowQuery(const QString &person, const QString &project, const QString &time, const QString &description, const QString &date);
 
-    bool deleteRowReportsQuery(QString user,QString project,QString date);
+    bool deleteRowReportsQuery(const QString &user, const QString &project, const QString &date);
     bool getAllUserReportsCountQuery(QString user, QString projectName, QString startDate, QString endDate);
 
     int getProjectCount() const;
@@ -61,7 +61,7 @@ public:
 
     bool getAllUserReportsQuery(QString user, QString projectName, QString startDate, QString endDate);
 
-    bool getAllUserProjects(QString user);
+    bool getAllUserProjects(const QString &user);
 
     int getIsUser() const;
     void setIsUser(int isUser);
@@ -80,11 +80,11 @@ signals:
     void setHoursAdmin(QString date,QString value,int j);
     void setReports(QString reportDate, QString projectName, QString desc, QString spentTime);
     void setReportsAdmin(int m, int k, QString text);
-    void setCheckBox(QString text);
+
     void dataUpdated();
-    void addButtons(int m);
+
     void addButtonsAdmin(int m);
-    void addToolTip(int m);
+
     void workerProjects(QString projectName);
     void setCheckBoxProjects(QString text);
     void dataUpdatedAdmin();
@@ -98,7 +98,7 @@ private:
     MyDatabase(const MyDatabase&);
     MyDatabase& operator=(const MyDatabase&);
     static MyDatabase *m_instance;
-    QSqlDatabase m_myDatabase;
+    QSqlDatabase m_database;
     QString m_currentUser;
     bool m_isAdmin;
     int m_isUser;
